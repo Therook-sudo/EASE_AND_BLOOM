@@ -31,3 +31,11 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+# Documents & Media
+*.docx
+*.doc
+*.mp4
+*.mov
+*.avi
+*.mkv
