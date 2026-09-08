@@ -1,0 +1,330 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  MEMBER
+  MODERATOR
+  CRISIS_LEAD
+  SUPER_ADMIN
+}
+
+enum DMPrivacy {
+  EVERYONE
+  MUTUAL_FOLLOWS
+  CLOSED
+}
+
+enum ModerationCategory {
+  HARASSMENT
+  MISINFORMATION
+  CRISIS
+  PREDATORY
+  OFF_TOPIC
+}
+
+enum ModerationTier {
+  TIER_1_AUTO_HIDE
+  TIER_2_FLAG_REVIEW
+  TIER_3_CRISIS_ESCALATE
+  TIER_4_REDIRECT
+}
+
+enum NoteClassification {
+  MISLEADING_MEDICAL_CLAIM
+  MISSING_CONTEXT
+  HELPFUL_CLARIFICATION
+}
+
+enum NoteStatus {
+  NEEDS_MORE_RATINGS
+  CURRENTLY_RATED_HELPFUL
+  NOT_HELPFUL
+}
+
+enum NoteRatingValue {
+  HELPFUL
+  SOMEWHAT_HELPFUL
+  NOT_HELPFUL
+}
+
+model User {
+  id                String      @id @default(uuid())
+  email             String      @unique
+  passwordHash      String
+  role              Role        @default(MEMBER)
+  quizVerified      Boolean     @default(false)
+  quizCompletedAt   DateTime?
+  isSuspended       Boolean     @default(false)
+  suspendedReason   String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  profile           Profile?
+  posts             Post[]
+  comments          Comment[]
+  reactions         Reaction[]
+  notesSubmitted    CommunityNote[]
+  noteRatings       CommunityNoteRating[]
+  pollVotes         PollVote[]
+  
+  following         Follow[]    @relation("UserFollowing")
+  followers         Follow[]    @relation("UserFollowers")
+  
+  sentMessages      Message[]
+  conversations     ConversationParticipant[]
+  notifications     Notification[]
+  contentFlags      ContentFlag[]
+}
+
+model Profile {
+  userId            String      @id
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  username          String      @unique
+  displayName       String
+  bio               String?
+  avatarUrl         String?
+  headerUrl         String?
+  
+  dmPrivacy         DMPrivacy   @default(MUTUAL_FOLLOWS)
+  pushEnabled       Boolean     @default(true)
+  quietHoursStart   String?     // e.g. "22:00"
+  quietHoursEnd     String?     // e.g. "08:00"
+  reputationScore   Int         @default(100)
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model Follow {
+  followerId        String
+  followingId       String
+  follower          User        @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following         User        @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt         DateTime    @default(now())
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model Tag {
+  id                String      @id @default(uuid())
+  name              String      @unique
+  slug              String      @unique
+  description       String?
+  isActive          Boolean     @default(true)
+  posts             PostTag[]
+}
+
+model Post {
+  id                String      @id @default(uuid())
+  authorId          String
+  author            User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  isAnonymous       Boolean     @default(false)
+  contentWarning    String?     // GRIEF, PREGNANCY_LOSS, EATING_DISORDERS, TRAUMA
+  content           String
+  mediaUrls         String[]
+  
+  status            String      @default("published") // pending_scan, published, hidden_under_review, deleted
+  isPinned          Boolean     @default(false)
+  
+  likesCount        Int         @default(0)
+  hugsCount         Int         @default(0)
+  commentsCount     Int         @default(0)
+  bookmarksCount    Int         @default(0)
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  tags              PostTag[]
+  comments          Comment[]
+  reactions         Reaction[]
+  communityNotes    CommunityNote[]
+  poll              Poll?
+  flags             ContentFlag[]
+
+  @@index([status, createdAt])
+}
+
+model PostTag {
+  postId            String
+  tagId             String
+  post              Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag               Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+}
+
+model Poll {
+  id                String      @id @default(uuid())
+  postId            String      @unique
+  post              Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  question          String
+  expiresAt         DateTime
+  totalVotes        Int         @default(0)
+  createdAt         DateTime    @default(now())
+  options           PollOption[]
+  votes             PollVote[]
+}
+
+model PollOption {
+  id                String      @id @default(uuid())
+  pollId            String
+  poll              Poll        @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  optionText        String
+  votesCount        Int         @default(0)
+  orderIndex        Int
+  votes             PollVote[]
+}
+
+model PollVote {
+  pollId            String
+  optionId          String
+  userId            String
+  poll              Poll        @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option            PollOption  @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime    @default(now())
+
+  @@id([pollId, userId])
+}
+
+model Comment {
+  id                String      @id @default(uuid())
+  postId            String
+  authorId          String
+  parentCommentId   String?
+  post              Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author            User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  isAnonymous       Boolean     @default(false)
+  content           String
+  likesCount        Int         @default(0)
+  status            String      @default("visible")
+  createdAt         DateTime    @default(now())
+}
+
+model Reaction {
+  id                String      @id @default(uuid())
+  userId            String
+  postId            String
+  reactionType      String      // like, hug_support, bookmark
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post              Post        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt         DateTime    @default(now())
+
+  @@unique([userId, postId, reactionType])
+}
+
+model CommunityNote {
+  id                String              @id @default(uuid())
+  postId            String
+  authorId          String
+  post              Post                @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author            User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  summary           String
+  sourceUrl         String
+  classification    NoteClassification
+  status            NoteStatus          @default(NEEDS_MORE_RATINGS)
+  helpfulScore      Float               @default(0.0)
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  ratings           CommunityNoteRating[]
+
+  @@index([postId, status])
+}
+
+model CommunityNoteRating {
+  id                String          @id @default(uuid())
+  noteId            String
+  raterId           String
+  note              CommunityNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  rater             User            @relation(fields: [raterId], references: [id], onDelete: Cascade)
+  
+  rating            NoteRatingValue
+  reasons           String[]
+  createdAt         DateTime        @default(now())
+
+  @@unique([noteId, raterId])
+}
+
+model Conversation {
+  id                String                    @id @default(uuid())
+  lastMessageAt     DateTime                  @default(now())
+  createdAt         DateTime                  @default(now())
+  participants      ConversationParticipant[]
+  messages          Message[]
+}
+
+model ConversationParticipant {
+  conversationId    String
+  userId            String
+  lastReadAt        DateTime                  @default(now())
+  isMuted           Boolean                   @default(false)
+  conversation      Conversation              @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+}
+
+model Message {
+  id                String          @id @default(uuid())
+  conversationId    String
+  senderId          String
+  content           String
+  mediaUrl          String?
+  createdAt         DateTime        @default(now())
+  conversation      Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender            User            @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model ContentFlag {
+  id                String              @id @default(uuid())
+  contentId         String
+  authorId          String
+  category          ModerationCategory
+  confidenceScore   Float
+  tier              ModerationTier
+  status            String              @default("pending") // pending, reviewed, actioned, dismissed
+  reviewerNotes     String?
+  createdAt         DateTime            @default(now())
+  user              User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  post              Post?               @relation(fields: [contentId], references: [id], onDelete: Cascade)
+}
+
+model CrisisEscalationLog {
+  id                        String      @id @default(uuid())
+  flagId                    String
+  userId                    String
+  subgroupId                String
+  contentSnippetEncrypted   String      // Encrypted AES-256
+  responderId               String?
+  acknowledgedAt            DateTime?
+  outreachStatus            String      @default("pending_outreach")
+  notesEncrypted            String?
+  createdAt                 DateTime    @default(now())
+}
+
+model Notification {
+  id                String      @id @default(uuid())
+  recipientId       String
+  actorId           String?
+  eventType         String      // hug_received, liked_post, reply_received, note_helpful
+  entityType        String      // post, comment, community_note
+  entityId          String
+  isRead            Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  recipient         User        @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt])
+}
