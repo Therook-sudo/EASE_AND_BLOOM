@@ -1,10 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Heart, MessageCircle, Bookmark, Sparkles, Shield, Compass, Bell, User, Plus, Info } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, MessageCircle, Bookmark, Sparkles, Shield, Compass, Bell, User, Plus, Info, CheckCircle2, Lock } from 'lucide-react';
+import { useAuthStore } from '../lib/auth-store';
+import AuthModal from '../components/auth/AuthModal';
+import SoftGateQuizModal from '../components/auth/SoftGateQuizModal';
+import ProfileModal from '../components/auth/ProfileModal';
 
 export default function HomeFeed() {
+  const { user, isAuthenticated, openAuthModal, openQuizModal, openProfileModal, initialize } = useAuthStore();
   const [activeTab, setActiveTab] = useState('all');
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   const topics = [
     { id: 'all', label: 'All Sanctuary' },
@@ -15,9 +24,28 @@ export default function HomeFeed() {
     { id: 'q-and-a', label: '#AskTheCommunity' },
   ];
 
+  const handleComposeClick = () => {
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
+    if (!user?.quizVerified) {
+      openQuizModal();
+      return;
+    }
+    alert('Opening post composer... (Phase 3 content module)');
+  };
+
   return (
     <div className="flex justify-center min-h-screen pb-20 md:pb-0">
+      {/* Auth, Quiz, and Profile Modals */}
+      <AuthModal />
+      <SoftGateQuizModal />
+      <ProfileModal />
+
+      {/* Main Container */}
       <main className="w-full max-w-2xl border-x border-stone-200 dark:border-bloom-darkBorder min-h-screen bg-bloom-bg dark:bg-bloom-dark">
+        
         {/* Sticky Header */}
         <header className="sticky top-0 z-30 backdrop-blur-md bg-bloom-bg/90 dark:bg-bloom-dark/90 border-b border-stone-200 dark:border-bloom-darkBorder px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -29,12 +57,55 @@ export default function HomeFeed() {
               <p className="text-xs text-bloom-muted">Your daily sanctuary</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="p-2 rounded-full hover:bg-bloom-blush dark:hover:bg-bloom-darkCard text-bloom-muted transition-colors">
-              <Bell className="w-5 h-5" />
-            </button>
+
+          <div className="flex items-center gap-2">
+            {isAuthenticated && user ? (
+              <button
+                onClick={openProfileModal}
+                className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-bloom-blush dark:bg-bloom-darkCard border border-stone-200 dark:border-stone-800 hover:border-bloom-terracotta transition-all"
+              >
+                <div className="w-6 h-6 rounded-full bg-bloom-terracotta text-white flex items-center justify-center text-xs font-bold">
+                  {user.profile.displayName ? user.profile.displayName.charAt(0).toUpperCase() : '🌸'}
+                </div>
+                <span className="text-xs font-medium text-stone-800 dark:text-stone-200 max-w-[100px] truncate">
+                  {user.profile.displayName}
+                </span>
+                {user.quizVerified && <CheckCircle2 className="w-3.5 h-3.5 text-bloom-sage" />}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openAuthModal('login')}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-bloom-wine dark:text-bloom-blush hover:bg-bloom-blush dark:hover:bg-bloom-darkCard transition-colors"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => openAuthModal('register')}
+                  className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-bloom-terracotta hover:bg-bloom-wine text-white shadow-sm transition-all"
+                >
+                  Join Sanctuary
+                </button>
+              </div>
+            )}
           </div>
         </header>
+
+        {/* Soft-Gate Verification Alert Banner (if logged in but unverified) */}
+        {isAuthenticated && user && !user.quizVerified && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🌸</span>
+              <span>Take the 1-minute welcome quiz to unlock full sanctuary participation!</span>
+            </div>
+            <button
+              onClick={openQuizModal}
+              className="px-3 py-1 rounded-full bg-amber-600 text-white font-semibold text-[11px] shadow-sm hover:bg-amber-700 transition-colors whitespace-nowrap ml-2"
+            >
+              Take Quiz
+            </button>
+          </div>
+        )}
 
         {/* Topic Filter Pills */}
         <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar border-b border-stone-200/60 dark:border-bloom-darkBorder/60">
@@ -55,7 +126,8 @@ export default function HomeFeed() {
 
         {/* Feed Posts */}
         <div className="divide-y divide-stone-200 dark:divide-bloom-darkBorder">
-          {/* Post 1: Welcome post */}
+          
+          {/* Post 1: Welcome Post */}
           <article className="p-4 hover:bg-stone-50/50 dark:hover:bg-bloom-darkCard/30 transition-colors">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-bloom-blush dark:bg-stone-800 flex items-center justify-center text-lg flex-shrink-0">
@@ -139,11 +211,15 @@ export default function HomeFeed() {
               </div>
             </div>
           </article>
+
         </div>
       </main>
 
       {/* Floating Compose Button */}
-      <button className="fixed bottom-6 right-6 md:bottom-8 md:right-8 w-14 h-14 rounded-full bg-bloom-terracotta text-white flex items-center justify-center shadow-lg hover:bg-bloom-wine transition-all active:scale-95 z-40">
+      <button
+        onClick={handleComposeClick}
+        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 w-14 h-14 rounded-full bg-bloom-terracotta text-white flex items-center justify-center shadow-lg hover:bg-bloom-wine transition-all active:scale-95 z-40"
+      >
         <Plus className="w-6 h-6" />
       </button>
 
@@ -161,9 +237,12 @@ export default function HomeFeed() {
           <MessageCircle className="w-5 h-5" />
           <span className="text-[10px] font-medium">Messages</span>
         </button>
-        <button className="flex flex-col items-center gap-0.5 text-bloom-muted hover:text-bloom-wine dark:hover:text-bloom-blush transition-colors">
+        <button
+          onClick={isAuthenticated ? openProfileModal : () => openAuthModal('login')}
+          className="flex flex-col items-center gap-0.5 text-bloom-muted hover:text-bloom-wine dark:hover:text-bloom-blush transition-colors"
+        >
           <User className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Profile</span>
+          <span className="text-[10px] font-medium">{isAuthenticated ? 'Profile' : 'Sign In'}</span>
         </button>
       </nav>
     </div>
