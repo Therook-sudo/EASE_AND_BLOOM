@@ -1,28 +1,159 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Bookmark, Sparkles, Shield, Compass, Bell, User, Plus, Info, CheckCircle2, Lock } from 'lucide-react';
+import { Compass, Shield, MessageCircle, User, Plus, CheckCircle2, Sparkles, Filter } from 'lucide-react';
 import { useAuthStore } from '../lib/auth-store';
+import { Post } from '../lib/types';
+import { apiRequest } from '../lib/api';
 import AuthModal from '../components/auth/AuthModal';
 import SoftGateQuizModal from '../components/auth/SoftGateQuizModal';
 import ProfileModal from '../components/auth/ProfileModal';
+import CreatePostModal from '../components/feed/CreatePostModal';
+import PostCard from '../components/feed/PostCard';
 
 export default function HomeFeed() {
   const { user, isAuthenticated, openAuthModal, openQuizModal, openProfileModal, initialize } = useAuthStore();
+  
   const [activeTab, setActiveTab] = useState('all');
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    loadFeed(activeTab);
+  }, [initialize, activeTab]);
 
   const topics = [
     { id: 'all', label: 'All Sanctuary' },
-    { id: 'mental-health', label: '#MentalHealth' },
-    { id: 'pcos-fertility', label: '#PCOS & Fertility' },
-    { id: 'wellness', label: '#SelfCare' },
-    { id: 'motherhood', label: '#Motherhood' },
-    { id: 'q-and-a', label: '#AskTheCommunity' },
+    { id: 'MentalHealth', label: '#MentalHealth' },
+    { id: 'PCOS-Fertility', label: '#PCOS & Fertility' },
+    { id: 'SelfCare', label: '#SelfCare' },
+    { id: 'Motherhood', label: '#Motherhood' },
+    { id: 'AskTheCommunity', label: '#AskTheCommunity' },
+    { id: 'GriefAndLoss', label: '#GriefAndLoss' },
   ];
+
+  const seedPosts: Post[] = [
+    {
+      id: 'post-seed-1',
+      content: "Today I finally opened up about my PCOS journey with my family. It felt terrifying to be so honest about my body and fertility fears, but shedding that silence was liberating. Thank you to everyone here who shared advice last month! 🌸 #PCOS #SelfCare #Wellness",
+      isAnonymous: false,
+      author: {
+        displayName: 'Sarah Johnson',
+        username: 'sarah_j',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
+        isAnonymous: false,
+        quizVerified: true,
+      },
+      tags: [
+        { id: 't1', name: 'PCOS', slug: 'pcos' },
+        { id: 't2', name: 'SelfCare', slug: 'selfcare' },
+      ],
+      mediaUrls: [
+        'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80',
+      ],
+      communityNotes: [
+        {
+          id: 'note-1',
+          summary: 'PCOS affects 1 in 10 women globally. Lifestyle changes, gentle movement, and medical guidance can significantly support hormonal balance.',
+        },
+      ],
+      likesCount: 38,
+      hugsCount: 22,
+      commentsCount: 14,
+      bookmarksCount: 9,
+      hasLiked: false,
+      hasSentHug: false,
+      createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    },
+    {
+      id: 'post-seed-2',
+      content: "Has anyone tried natural cycle tracking & acupuncture for managing intense ovulation mood swings? Looking for gentle, natural ways to cope without feeling crazy. #PCOS-Fertility #MentalHealth",
+      isAnonymous: true,
+      author: {
+        displayName: 'Anonymous Sister',
+        username: 'anonymous',
+        avatarUrl: null,
+        isAnonymous: true,
+        quizVerified: true,
+      },
+      tags: [
+        { id: 't3', name: 'PCOS-Fertility', slug: 'pcos-fertility' },
+        { id: 't4', name: 'MentalHealth', slug: 'mentalhealth' },
+      ],
+      mediaUrls: [],
+      poll: {
+        id: 'poll-seed-1',
+        question: 'Which holistic practice has helped your hormonal mood swings most?',
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+        totalVotes: 42,
+        hasEnded: false,
+        options: [
+          { id: 'opt-1', optionText: 'Seed cycling & clean nutrition', votesCount: 18, percentage: 43 },
+          { id: 'opt-2', optionText: 'Acupuncture & herbs', votesCount: 12, percentage: 29 },
+          { id: 'opt-3', optionText: 'Somatic breathwork & yoga', votesCount: 10, percentage: 24 },
+          { id: 'opt-4', optionText: 'None worked yet (seeking tips)', votesCount: 2, percentage: 4 },
+        ],
+      },
+      likesCount: 29,
+      hugsCount: 31,
+      commentsCount: 18,
+      bookmarksCount: 12,
+      hasLiked: false,
+      hasSentHug: false,
+      createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+    },
+    {
+      id: 'post-seed-3',
+      content: "It has been 6 months since our miscarriage, and today was supposed to be my due date. The quiet grief hits in unexpected waves. Holding space for any sister walking through this silent heartbreak today. 🕊️",
+      isAnonymous: true,
+      contentWarning: 'PREGNANCY_LOSS',
+      author: {
+        displayName: 'Anonymous Sister',
+        username: 'anonymous',
+        avatarUrl: null,
+        isAnonymous: true,
+        quizVerified: true,
+      },
+      tags: [
+        { id: 't5', name: 'GriefAndLoss', slug: 'griefandloss' },
+        { id: 't6', name: 'Motherhood', slug: 'motherhood' },
+      ],
+      mediaUrls: [],
+      likesCount: 54,
+      hugsCount: 88,
+      commentsCount: 32,
+      bookmarksCount: 7,
+      hasLiked: false,
+      hasSentHug: false,
+      createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+    },
+  ];
+
+  const loadFeed = async (tag: string) => {
+    setLoading(true);
+    try {
+      const endpoint = tag === 'all' ? '/posts' : `/posts?tag=${tag}`;
+      const res = await apiRequest<{ items: Post[] }>(endpoint);
+      if (res.items && res.items.length > 0) {
+        setPosts(res.items);
+      } else {
+        // Filter seed posts by selected tag
+        const filtered = tag === 'all'
+          ? seedPosts
+          : seedPosts.filter((p) => p.tags.some((t) => t.name.toLowerCase() === tag.toLowerCase()));
+        setPosts(filtered);
+      }
+    } catch {
+      const filtered = tag === 'all'
+        ? seedPosts
+        : seedPosts.filter((p) => p.tags.some((t) => t.name.toLowerCase() === tag.toLowerCase()));
+      setPosts(filtered);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleComposeClick = () => {
     if (!isAuthenticated) {
@@ -33,15 +164,24 @@ export default function HomeFeed() {
       openQuizModal();
       return;
     }
-    alert('Opening post composer... (Phase 3 content module)');
+    setIsComposeOpen(true);
+  };
+
+  const handlePostCreated = (newPost: Post) => {
+    setPosts([newPost, ...posts]);
   };
 
   return (
     <div className="flex justify-center min-h-screen pb-20 md:pb-0">
-      {/* Auth, Quiz, and Profile Modals */}
+      {/* Modals */}
       <AuthModal />
       <SoftGateQuizModal />
       <ProfileModal />
+      <CreatePostModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+        onPostCreated={handlePostCreated}
+      />
 
       {/* Main Container */}
       <main className="w-full max-w-2xl border-x border-stone-200 dark:border-bloom-darkBorder min-h-screen bg-bloom-bg dark:bg-bloom-dark">
@@ -54,7 +194,7 @@ export default function HomeFeed() {
             </div>
             <div>
               <h1 className="font-semibold text-lg leading-tight tracking-tight text-bloom-wine dark:text-bloom-blush">Ease & Bloom</h1>
-              <p className="text-xs text-bloom-muted">Your daily sanctuary</p>
+              <p className="text-xs text-bloom-muted">Women's Wellness Sanctuary</p>
             </div>
           </div>
 
@@ -91,12 +231,12 @@ export default function HomeFeed() {
           </div>
         </header>
 
-        {/* Soft-Gate Verification Alert Banner (if logged in but unverified) */}
+        {/* Soft-Gate Alert Banner (if unverified) */}
         {isAuthenticated && user && !user.quizVerified && (
           <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
             <div className="flex items-center gap-2">
               <span className="text-base">🌸</span>
-              <span>Take the 1-minute welcome quiz to unlock full sanctuary participation!</span>
+              <span>Take the 1-minute welcome quiz to unlock full sanctuary posting!</span>
             </div>
             <button
               onClick={openQuizModal}
@@ -124,94 +264,40 @@ export default function HomeFeed() {
           ))}
         </div>
 
+        {/* Quick Post Prompt Bar */}
+        <div
+          onClick={handleComposeClick}
+          className="p-4 border-b border-stone-200/70 dark:border-bloom-darkBorder/70 flex items-center gap-3 cursor-pointer hover:bg-stone-50/50 dark:hover:bg-bloom-darkCard/30 transition-colors"
+        >
+          <div className="w-9 h-9 rounded-full bg-bloom-blush dark:bg-stone-800 flex items-center justify-center text-sm font-bold text-bloom-terracotta">
+            🌸
+          </div>
+          <div className="flex-1 px-4 py-2.5 rounded-full bg-stone-100 dark:bg-stone-800/80 text-xs text-bloom-muted">
+            Share what's on your heart, ask sisters, or create a poll...
+          </div>
+        </div>
+
         {/* Feed Posts */}
-        <div className="divide-y divide-stone-200 dark:divide-bloom-darkBorder">
-          
-          {/* Post 1: Welcome Post */}
-          <article className="p-4 hover:bg-stone-50/50 dark:hover:bg-bloom-darkCard/30 transition-colors">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-bloom-blush dark:bg-stone-800 flex items-center justify-center text-lg flex-shrink-0">
-                ✨
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-sm text-stone-900 dark:text-stone-100">Ease & Bloom Sanctuary</span>
-                    <span className="text-xs text-bloom-muted">@sanctuary · 1h</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-bloom-sage/20 text-bloom-wine dark:text-bloom-sage">Welcome</span>
-                </div>
-
-                <p className="mt-2 text-sm text-stone-800 dark:text-stone-200 leading-relaxed">
-                  Welcome to our new home! A gentle, private space to express your wellness journey, share advice, and lift each other up without the noise. 🌸
-                </p>
-
-                {/* Community Notes Callout */}
-                <div className="mt-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/40 text-xs">
-                  <div className="flex items-center gap-1.5 text-amber-900 dark:text-amber-300 font-semibold mb-1">
-                    <Info className="w-3.5 h-3.5" /> Community Context
-                  </div>
-                  <p className="text-amber-800 dark:text-amber-200/90 leading-normal">
-                    Readers added context: Ease & Bloom is a verified women-only community with 24/7 compassionate moderation.
-                  </p>
-                </div>
-
-                {/* Post Actions */}
-                <div className="flex items-center justify-between mt-3 text-bloom-muted text-xs max-w-sm">
-                  <button className="flex items-center gap-1 hover:text-rose-500 transition-colors">
-                    <Heart className="w-4 h-4" /> <span>24</span>
-                  </button>
-                  <button className="flex items-center gap-1 hover:text-bloom-terracotta transition-colors">
-                    <Sparkles className="w-4 h-4" /> <span>12 Hugs</span>
-                  </button>
-                  <button className="flex items-center gap-1 hover:text-bloom-wine transition-colors">
-                    <MessageCircle className="w-4 h-4" /> <span>8</span>
-                  </button>
-                  <button className="hover:text-stone-900 dark:hover:text-white transition-colors">
-                    <Bookmark className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+        <div>
+          {loading ? (
+            <div className="py-16 text-center text-xs text-bloom-muted">
+              Loading sanctuary discussions...
             </div>
-          </article>
-
-          {/* Post 2: Anonymous Question */}
-          <article className="p-4 hover:bg-stone-50/50 dark:hover:bg-bloom-darkCard/30 transition-colors">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-stone-200 dark:bg-stone-800 flex items-center justify-center text-sm font-semibold text-bloom-muted flex-shrink-0">
-                🎭
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-sm text-stone-900 dark:text-stone-100">Anonymous Sister</span>
-                    <span className="text-xs text-bloom-muted">· 3h</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300">Anonymous</span>
-                </div>
-
-                <p className="mt-2 text-sm text-stone-800 dark:text-stone-200 leading-relaxed">
-                  Has anyone here tried natural cycle tracking for PCOS? Looking for practical tips on managing mood fluctuations during ovulation. #PCOS #MoodCare
-                </p>
-
-                <div className="flex items-center justify-between mt-3 text-bloom-muted text-xs max-w-sm">
-                  <button className="flex items-center gap-1 hover:text-rose-500 transition-colors">
-                    <Heart className="w-4 h-4" /> <span>18</span>
-                  </button>
-                  <button className="flex items-center gap-1 hover:text-bloom-terracotta transition-colors">
-                    <Sparkles className="w-4 h-4" /> <span>15 Hugs</span>
-                  </button>
-                  <button className="flex items-center gap-1 hover:text-bloom-wine transition-colors">
-                    <MessageCircle className="w-4 h-4" /> <span>14</span>
-                  </button>
-                  <button className="hover:text-stone-900 dark:hover:text-white transition-colors">
-                    <Bookmark className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+          ) : posts.length === 0 ? (
+            <div className="py-16 text-center text-xs text-bloom-muted">
+              No discussions yet in this topic. Be the first sister to share!
             </div>
-          </article>
-
+          ) : (
+            posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onPostUpdated={(updated) => {
+                  setPosts(posts.map((p) => (p.id === updated.id ? updated : p)));
+                }}
+              />
+            ))
+          )}
         </div>
       </main>
 
