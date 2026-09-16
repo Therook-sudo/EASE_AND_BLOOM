@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ModerationService, ModerationTier } from '../moderation/moderation.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { FeedQueryDto } from './dto/feed-query.dto';
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moderationService: ModerationService,
+  ) {}
 
   async create(userId: string, dto: CreatePostDto) {
     // 1. Process tags (find or create)
@@ -29,7 +33,7 @@ export class PostsService {
       }
     }
 
-    // 2. Create Post
+    // 2. Initial Post Creation
     const post = await this.prisma.post.create({
       data: {
         authorId: userId,
@@ -80,6 +84,9 @@ export class PostsService {
         },
       },
     });
+
+    // 3. Evaluate content through 2-Stage Moderation & Crisis Routing Pipeline
+    await this.moderationService.processPostModeration(post, dto.content, userId);
 
     return this.formatPostForClient(post, userId);
   }
@@ -229,7 +236,6 @@ export class PostsService {
       throw new NotFoundException('Poll option does not exist.');
     }
 
-    // Atomic transaction: Create vote and increment counts
     await this.prisma.$transaction([
       this.prisma.pollVote.create({
         data: {
@@ -290,7 +296,6 @@ export class PostsService {
   }
 
   private formatPostForClient(post: any, currentUserId?: string) {
-    // Anonymization logic: If isAnonymous is true, strip author identity for all public queries!
     const isAnonymous = post.isAnonymous;
     const author = isAnonymous
       ? {

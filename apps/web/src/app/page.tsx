@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Compass, Shield, MessageCircle, User, Plus, CheckCircle2, Sparkles, Filter } from 'lucide-react';
+import { Compass, Shield, MessageCircle, User, Plus, CheckCircle2, Sparkles, Filter, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../lib/auth-store';
 import { Post } from '../lib/types';
 import { apiRequest } from '../lib/api';
@@ -10,12 +10,14 @@ import SoftGateQuizModal from '../components/auth/SoftGateQuizModal';
 import ProfileModal from '../components/auth/ProfileModal';
 import CreatePostModal from '../components/feed/CreatePostModal';
 import PostCard from '../components/feed/PostCard';
+import AdminModHubModal from '../components/moderation/AdminModHubModal';
 
 export default function HomeFeed() {
   const { user, isAuthenticated, openAuthModal, openQuizModal, openProfileModal, initialize } = useAuthStore();
   
   const [activeTab, setActiveTab] = useState('all');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isModHubOpen, setIsModHubOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,7 +141,6 @@ export default function HomeFeed() {
       if (res.items && res.items.length > 0) {
         setPosts(res.items);
       } else {
-        // Filter seed posts by selected tag
         const filtered = tag === 'all'
           ? seedPosts
           : seedPosts.filter((p) => p.tags.some((t) => t.name.toLowerCase() === tag.toLowerCase()));
@@ -182,6 +183,10 @@ export default function HomeFeed() {
         onClose={() => setIsComposeOpen(false)}
         onPostCreated={handlePostCreated}
       />
+      <AdminModHubModal
+        isOpen={isModHubOpen}
+        onClose={() => setIsModHubOpen(false)}
+      />
 
       {/* Main Container */}
       <main className="w-full max-w-2xl border-x border-stone-200 dark:border-bloom-darkBorder min-h-screen bg-bloom-bg dark:bg-bloom-dark">
@@ -199,6 +204,16 @@ export default function HomeFeed() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Moderator / Crisis Hub Trigger Button */}
+            <button
+              onClick={() => setIsModHubOpen(true)}
+              title="Moderator & Crisis Care Hub"
+              className="p-2 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 hover:bg-rose-100 transition-colors border border-rose-200 dark:border-rose-900 flex items-center gap-1 text-xs font-semibold"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span className="hidden sm:inline">Safety Hub</span>
+            </button>
+
             {isAuthenticated && user ? (
               <button
                 onClick={openProfileModal}
@@ -315,9 +330,12 @@ export default function HomeFeed() {
           <Compass className="w-5 h-5" />
           <span className="text-[10px] font-medium">Feed</span>
         </button>
-        <button className="flex flex-col items-center gap-0.5 text-bloom-muted hover:text-bloom-wine dark:hover:text-bloom-blush transition-colors">
+        <button
+          onClick={() => setIsModHubOpen(true)}
+          className="flex flex-col items-center gap-0.5 text-rose-500 hover:text-rose-700 transition-colors"
+        >
           <Shield className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Notes</span>
+          <span className="text-[10px] font-medium">Safety Hub</span>
         </button>
         <button className="flex flex-col items-center gap-0.5 text-bloom-muted hover:text-bloom-wine dark:hover:text-bloom-blush transition-colors">
           <MessageCircle className="w-5 h-5" />
